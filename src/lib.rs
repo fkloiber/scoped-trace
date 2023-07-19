@@ -142,6 +142,9 @@ impl Trace {
                 context_cell.set(Some(context));
             }
         });
+        // prevent tail call optimization of the previous call
+        // so this function gets a distinct Fram in the backtrace.
+        std::hint::black_box(());
     }
 }
 
