@@ -40,7 +40,7 @@
 //!      └╼ inlining::baz at example.rs:18:5
 //! ```
 
-use backtrace::BacktraceFrame;
+use backtrace::{BacktraceFrame, Frame};
 use std::{cell::Cell, ffi::c_void, fmt, ptr};
 
 mod symbol;
@@ -123,7 +123,8 @@ impl Trace {
                 let mut frames = vec![];
                 let mut above_leaf = false;
                 backtrace::trace(|frame| {
-                    let below_root = !ptr::eq(frame.symbol_address(), context.root_addr);
+                    let symbol_address = read_symbol_address(frame);
+                    let below_root = !ptr::eq(symbol_address, context.root_addr);
 
                     // only capture frames above `Trace::leaf()` and below
                     // `Trace::root_inner()`.
@@ -131,7 +132,7 @@ impl Trace {
                         frames.push(frame.to_owned().into());
                     }
 
-                    if ptr::eq(frame.symbol_address(), Self::leaf as *const _) {
+                    if ptr::eq(symbol_address, Self::leaf as *const _) {
                         above_leaf = true;
                     }
 
@@ -146,6 +147,14 @@ impl Trace {
         // so this function gets a distinct Fram in the backtrace.
         std::hint::black_box(());
     }
+}
+
+fn real_symbol_address(frame: &Frame) -> *mut c_void {
+    let mut addr = None;
+    backtrace::resolve(frame.ip(), |sym| {
+        addr = sym.addr();
+    });
+    addr.unwrap_or(std::ptr::null_mut())
 }
 
 impl fmt::Display for Trace {
